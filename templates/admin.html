@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Order Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container" style="max-width: 1200px;">
+        
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🛠️</span>
+                <span>Admin Panel</span>
+            </div>
+            <div class="flex-between gap-2">
+                <a href="{{ url_for('home') }}" class="btn btn-secondary btn-sm" target="_blank">View Search Site ↗</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'info' }}">
+                        <span>{% if category == 'success' %}✅{% elif category == 'error' %}⚠️{% else %}ℹ️{% endif %}&nbsp;</span>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if admin_password_is_default %}
+        <div class="alert alert-error" style="margin-bottom: 2rem;">
+            <span>🛡️</span>
+            <span><strong>Security Warning:</strong> You are currently using the default admin password (<code>admin123</code>). Please change this in production by setting the <code>ADMIN_PASSWORD</code> environment variable.</span>
+        </div>
+        {% endif %}
+
+        <!-- Quick Stats -->
+        <div class="admin-stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Orders</div>
+                <div class="stat-value">{{ total_orders }}</div>
+            </div>
+            <div class="stat-card" style="border-left: 4px solid var(--accent);">
+                <div class="stat-label">In Production</div>
+                <div class="stat-value" style="color: hsl(263, 90%, 75%);">{{ in_production }}</div>
+            </div>
+            <div class="stat-card" style="border-left: 4px solid var(--info);">
+                <div class="stat-label">Active Shipments</div>
+                <div class="stat-value" style="color: hsl(199, 90%, 65%);">{{ ready_or_transit }}</div>
+            </div>
+        </div>
+
+        <!-- Dashboard Actions (Search, Filters, Add Order) -->
+        <div class="dashboard-actions">
+            <form action="{{ url_for('admin_dashboard') }}" method="GET" class="filters-bar">
+                <input type="text" name="search" placeholder="Search Order #, Client, Items..." value="{{ search }}">
+                
+                <select name="status" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="Order Received" {% if status_filter == 'Order Received' %}selected{% endif %}>Order Received</option>
+                    <option value="Sample Approval" {% if status_filter == 'Sample Approval' %}selected{% endif %}>Sample Approval</option>
+                    <option value="Production Start" {% if status_filter == 'Production Start' %}selected{% endif %}>Production Start</option>
+                    <option value="Packing" {% if status_filter == 'Packing' %}selected{% endif %}>Packing</option>
+                    <option value="Ready for Dispatch" {% if status_filter == 'Ready for Dispatch' %}selected{% endif %}>Ready for Dispatch</option>
+                    <option value="In Transit" {% if status_filter == 'In Transit' %}selected{% endif %}>In Transit</option>
+                    <option value="Delivered" {% if status_filter == 'Delivered' %}selected{% endif %}>Delivered</option>
+                </select>
+                
+                {% if search or status_filter %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm" style="padding: 0.6rem 1rem;">Clear Filters</a>
+                {% endif %}
+            </form>
+            
+            <button class="btn btn-primary" id="btn-add-order">+ New Order</button>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="card" style="padding: 1.5rem; border-radius: var(--radius-md);">
+            {% if orders %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Client Name</th>
+                            <th>Items & Specs</th>
+                            <th>Status</th>
+                            <th>Est. Delivery</th>
+                            <th>Last Update</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('track_order', order_number=order.order_number) }}" target="_blank" style="font-weight: 600; color: var(--primary-hover);">
+                                    {{ order.order_number }} ↗
+                                </a>
+                            </td>
+                            <td><strong>{{ order.client_name }}</strong></td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ order.item_details }}">
+                                {{ order.item_details }}
+                            </td>
+                            <td>
+                                <span class="status-badge {% if order.status == 'Order Received' %}received{% elif order.status == 'Sample Approval' %}sample-approval{% elif order.status == 'Production Start' %}production-start{% elif order.status == 'Packing' %}packing{% elif order.status == 'Ready for Dispatch' %}dispatch{% elif order.status == 'In Transit' %}transit{% elif order.status == 'Delivered' %}delivered{% endif %}" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">
+                                    {{ order.status }}
+                                </span>
+                            </td>
+                            <td>{{ order.estimated_delivery or '-' }}</td>
+                            <td style="font-size: 0.8rem; color: var(--text-muted);">{{ order.updated_at }}</td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="btn btn-secondary btn-sm btn-edit" 
+                                            data-id="{{ order.id }}"
+                                            data-ordernum="{{ order.order_number }}"
+                                            data-client="{{ order.client_name }}"
+                                            data-email="{{ order.email }}"
+                                            data-items="{{ order.item_details }}"
+                                            data-status="{{ order.status }}"
+                                            data-notes="{{ order.notes }}"
+                                            data-courier="{{ order.courier_name }}"
+                                            data-tracking="{{ order.tracking_number }}"
+                                            data-est="{{ order.estimated_delivery }}">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm btn-copy-link" data-ordernum="{{ order.order_number }}">Link</button>
+                                    <button class="btn btn-secondary btn-sm btn-whatsapp" 
+                                            data-client="{{ order.client_name }}" 
+                                            data-status="{{ order.status }}" 
+                                            data-ordernum="{{ order.order_number }}">
+                                        💬 WhatsApp
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center" style="padding: 3rem 1rem; color: var(--text-muted);">
+                <p style="font-size: 1.2rem; margin-bottom: 1rem;">No orders found</p>
+                <p>Create a new order to get started!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ADD ORDER MODAL -->
+    <div id="modal-add" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="close-add">&times;</span>
+            <h2>Create New Order</h2>
+            <form action="{{ url_for('admin_create_order') }}" method="POST">
+                <div class="form-group">
+                    <label for="add-order-number">Order ID (Leave blank to auto-generate)</label>
+                    <input type="text" id="add-order-number" name="order_number" placeholder="e.g. MK-2026-004">
+                </div>
+                
+                <div class="form-group">
+                    <label for="add-client-name">Client Name *</label>
+                    <input type="text" id="add-client-name" name="client_name" placeholder="e.g. Rahul Traders" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="add-email">Client Email Address (Optional - for auto email notifications)</label>
+                    <input type="email" id="add-email" name="email" placeholder="e.g. client@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="add-item-details">Items & Specifications *</label>
+                    <textarea id="add-item-details" name="item_details" placeholder="e.g. 500x Custom Engraved Pens - Blue Ink" required></textarea>
+                </div>
+                
+                <div class="detail-grid" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label for="add-status">Status</label>
+                        <select id="add-status" name="status">
+                            <option value="Order Received">Order Received</option>
+                            <option value="Sample Approval">Sample Approval</option>
+                            <option value="Production Start">Production Start</option>
+                            <option value="Packing">Packing</option>
+                            <option value="Ready for Dispatch">Ready for Dispatch</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="add-estimated-delivery">Expected Dispatch/Delivery</label>
+                        <input type="text" id="add-estimated-delivery" name="estimated_delivery" placeholder="e.g. 15 June 2026">
+                    </div>
+                </div>
+
+                <div class="detail-grid" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label for="add-courier-name">Courier Partner</label>
+                        <input type="text" id="add-courier-name" name="courier_name" placeholder="e.g. Blue Dart">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="add-tracking-number">Tracking ID</label>
+                        <input type="text" id="add-tracking-number" name="tracking_number" placeholder="e.g. 7846263728">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="add-notes">Internal Private Notes (Only visible to you)</label>
+                    <textarea id="add-notes" name="notes" placeholder="e.g. engraving requires font Calibri size 12. Deposit received."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-full">Create Order</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT ORDER MODAL -->
+    <div id="modal-edit" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="close-edit">&times;</span>
+            <h2 id="edit-modal-title">Edit Order</h2>
+            
+            <form id="edit-form" action="" method="POST">
+                <div class="form-group">
+                    <label>Order ID (Cannot be changed)</label>
+                    <input type="text" id="edit-order-number" readonly style="opacity: 0.6; cursor: not-allowed; background: hsla(223, 47%, 4%, 0.4);">
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-client-name">Client Name *</label>
+                    <input type="text" id="edit-client-name" name="client_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-email">Client Email Address (Optional - for auto email notifications)</label>
+                    <input type="email" id="edit-email" name="email" placeholder="e.g. client@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-item-details">Items & Specifications *</label>
+                    <textarea id="edit-item-details" name="item_details" required></textarea>
+                </div>
+                
+                <div class="detail-grid" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label for="edit-status">Status</label>
+                        <select id="edit-status" name="status">
+                            <option value="Order Received">Order Received</option>
+                            <option value="Sample Approval">Sample Approval</option>
+                            <option value="Production Start">Production Start</option>
+                            <option value="Packing">Packing</option>
+                            <option value="Ready for Dispatch">Ready for Dispatch</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-estimated-delivery">Expected Dispatch/Delivery</label>
+                        <input type="text" id="edit-estimated-delivery" name="estimated_delivery">
+                    </div>
+                </div>
+
+                <div class="detail-grid" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label for="edit-courier-name">Courier Partner</label>
+                        <input type="text" id="edit-courier-name" name="courier_name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-tracking-number">Tracking ID</label>
+                        <input type="text" id="edit-tracking-number" name="tracking_number">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-notes">Internal Private Notes (Only visible to you)</label>
+                    <textarea id="edit-notes" name="notes"></textarea>
+                </div>
+            </form>
+            
+            <form id="delete-form" action="" method="POST" onsubmit="return confirm('Are you sure you want to delete this order permanently?');">
+            </form>
+            
+            <div class="flex-between gap-2 mt-4">
+                <button type="submit" form="edit-form" class="btn btn-primary" style="flex-grow: 1;">Save Changes</button>
+                <button type="submit" form="delete-form" class="btn btn-danger">Delete Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast message -->
+    <div id="toast" class="toast">Copied tracker link to clipboard!</div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

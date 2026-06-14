@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Client Order Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container auth-container text-center">
+        <div class="card">
+            <div class="logo justify-center mb-4" style="justify-content: center; margin-bottom: 2rem;">
+                <span class="logo-icon">📦</span>
+                <span>Order Tracker</span>
+            </div>
+            
+            <h1>Track Your Order</h1>
+            <p class="subtitle">Enter the Order ID shared with you to see the real-time status of your bulk/custom order.</p>
+
+            {% if error %}
+            <div class="alert alert-error">
+                <span>⚠️</span>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'info' }}">
+                            <span>ℹ️</span>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('track_search') }}" method="POST">
+                <div class="form-group">
+                    <label for="order_number">Order ID / Tracking Number</label>
+                    <div class="lookup-box">
+                        <input type="text" id="order_number" name="order_number" placeholder="e.g. MK-2026-X83Y" required autocomplete="off">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full mt-4">Track Status</button>
+            </form>
+            
+            <div class="mt-4">
+                <a href="{{ url_for('login') }}" class="btn btn-secondary btn-full btn-sm">Admin Portal Login</a>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2026 B2B Order Tracker. Made with love for your business.</p>
+    </footer>
+</body>
+</html>

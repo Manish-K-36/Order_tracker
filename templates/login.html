@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - B2B Order Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container auth-container">
+        <div class="card">
+            <div class="logo justify-center mb-4" style="justify-content: center; margin-bottom: 2rem;">
+                <span class="logo-icon">🔒</span>
+                <span>Admin Portal</span>
+            </div>
+
+            <h1 class="text-center">Welcome Back</h1>
+            <p class="subtitle text-center">Please enter the admin password to access the order dashboard.</p>
+
+            {% if error %}
+            <div class="alert alert-error">
+                <span>⚠️</span>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'info' }}">
+                            <span>ℹ&nbsp;</span>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('login') }}" method="POST">
+                <div class="form-group">
+                    <label for="password">Enter Admin Password</label>
+                    <input type="password" id="password" name="password" placeholder="••••••••" required autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full mt-4">Login to Dashboard</button>
+            </form>
+            
+            {% if admin_password_is_default %}
+            <div class="alert alert-info mt-4" style="font-size: 0.8rem; padding: 0.75rem 1rem;">
+                <span>💡</span>
+                <span>Default setup password is <strong>admin123</strong>. Set the <code>ADMIN_PASSWORD</code> environment variable in your host settings (Render/Replit) to change this.</span>
+            </div>
+            {% endif %}
+
+            <div class="mt-4 text-center">
+                <a href="{{ url_for('home') }}" class="btn btn-secondary btn-sm btn-full">← Back to Tracking Search</a>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2026 B2B Order Tracker. Made with love for your business.</p>
+    </footer>
+</body>
+</html>
